@@ -52,6 +52,8 @@ def clean_context_text(text: str) -> str:
         lowered = stripped.lower()
         if re.match(r"^(client|customer|assistant description|faq|frequently asked questions)\b", lowered):
             continue
+        if re.match(r"^(user|facilitation)\b", lowered):
+            continue
         if re.match(r"^(q:|a:)\b", lowered):
             continue
         if len(stripped) < 3:
@@ -234,6 +236,10 @@ def clean_response(text: str) -> str:
             continue
         if lowered.startswith("assistant:"):
             continue
+        if lowered.startswith("user is this response acceptable"):
+            continue
+        if lowered.startswith("facilitation:"):
+            continue
         if lowered.startswith("rewrite the answer"):
             continue
         if lowered.startswith("return only a rewritten answer"):
@@ -321,9 +327,6 @@ def chat(message, user_id: str = "default_user"):
                 cleaned = rewritten_clean
             elif not cleaned:
                 cleaned = "Could you clarify what you need help with?"
-        if cleaned and context_urls:
-            sources_block = "\n\nSources:\n" + "\n".join(f"- {url}" for url in context_urls[:3])
-            return cleaned + sources_block
         return cleaned or response
     except StopIteration:
         print("Chat Error: StopIteration")
