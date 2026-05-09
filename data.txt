@@ -1,0 +1,63 @@
+DOCUMENT PROTOCOL: Devryze.tech
+KNOWLEDGE BASE
+VERSION: 2026.Q1.V4
+OBJECTIVE: Customer Query Resolution & Service Indexing
+LAST UPDATED: March 7, 2026
+
+1) Executive Summary
+Devryze is a specialized engineering firm building "Intelligence Layers" for modern enterprises.
+We bridge AI research and production-ready software, covering system architecture, RAG design,
+deployment, and performance optimization.
+
+2) Official Contacts
+- Website: https://devryze.tech/
+- LinkedIn: https://www.linkedin.com/company/pk-devryze/
+- Instagram: https://www.instagram.com/devryze_pk/
+- Inquiry Portal: https://www.devryze.tech/#contact
+- Availability: 24/7 Global Operations
+
+3) Core Services
+- AI Chatbots and RAG Systems: Custom retrieval-augmented assistants with guardrails and source citations.
+- AI Strategy and Architecture: Roadmaps, system blueprints, and compliance-aware design.
+- Workflow Automation: Orchestration for repetitive business processes.
+- Machine Learning: Model deployment, computer vision (YOLOv8), and predictive analytics.
+- Full-Stack Web Development: Next.js frontends and Django APIs for high performance.
+- Mobile App Development: Flutter and Native Android apps.
+- Data Analytics and Telemetry: Dashboards and automated reporting.
+
+4) Case Studies
+- Saamay AI: Voice agent for recitation accuracy tracking. Tech: Flutter, Voice AI, Whisper.
+- Adryze: Marketing platform for real-time ad analytics. Tech: Django, marketing ops.
+- Documind: Intelligent CV processing and document intelligence. Tech: YOLOv8, RAG pipelines.
+
+5) Additional Capabilities
+- Engineering design and technical writing
+- Computer networking and telecommunications
+- SEO and marketing attribution modeling
+- Database management (SQL, NoSQL, vector)
+
+6) Onboarding (Summary)
+Customers submit the contact form with name, email, organization, selected service, and project scope.
+A solutions engineer schedules a discovery call within 24 hours and issues a proposal and timeline.
+
+7) SLA
+Standard response time: under 6 hours. Critical issues: under 1 hour.
+
+8) Security and Privacy
+Devryze enforces encryption in transit, role-based access control, audit logging, and strict data isolation.
+
+9) FAQ
+Q: What does Devryze specialize in?
+A: Building intelligence layers that integrate AI into enterprise systems, from design to deployment.
+
+Q: Do you build custom AI chatbots?
+A: Yes, Devryze delivers custom RAG assistants with enterprise guardrails and citations.
+
+Q: Do you offer workflow automation?
+A: Yes, workflow automation is production-ready and focused on operational efficiency.
+
+Q: What frameworks do you use for web development?
+A: Next.js for frontends and Django APIs for backends.
+
+Q: How can I start a project?
+A: Use the contact form and provide organization details, desired services, and project scope.

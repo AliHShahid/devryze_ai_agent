@@ -1,0 +1,51 @@
+# IDE and OS files
+.vscode/
+.idea/
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+*.so
+.DS_Store
+Thumbs.db
+
+# Django
+*.log
+db.sqlite3
+chat_history.db
+/staticfiles/
+/static/
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Virtual Environments
+.virtualenvs/
+.env.local
+.env.*.local
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+
+# IDE
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Production
+/media/
