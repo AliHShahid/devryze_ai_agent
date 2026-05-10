@@ -1,6 +1,4 @@
-"""
-URL Configuration for Devryze Chatbot
-"""
+"""URL Configuration for Devryze Chatbot"""
 
 from django.urls import path, include
 from django.views.generic import TemplateView

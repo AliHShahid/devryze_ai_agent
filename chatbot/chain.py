@@ -1,6 +1,5 @@
 import os
 import re
-from urllib.parse import urlparse
 from pathlib import Path
 from dotenv import load_dotenv
 from langsmith import traceable
@@ -26,40 +25,70 @@ if not hf_token or hf_token == "hf_your_token_here":
     )
 
 
-# 1. Setup Data & Vector DB
-ALLOWED_SOURCE_DOMAINS = {"devryze.tech", "linkedin.com", "instagram.com"}
+# 1. Setup Data & Vector DB (data.txt only)
+META_LINE_PREFIXES = (
+    "document id",
+    "version",
+    "last updated",
+    "document type",
+    "objective",
+    "section:",
+    "topic:",
+    "source_id:",
+    "client:",
+    "customer:",
+    "assistant description",
+    "faq",
+    "frequently asked questions",
+    "user:",
+    "facilitation",
+    "q:",
+    "a:",
+)
 
-def is_allowed_source(url: str) -> bool:
-    try:
-        host = urlparse(url).netloc.lower()
-        if host.startswith("www."):
-            host = host[4:]
-        return host in ALLOWED_SOURCE_DOMAINS
-    except Exception:
-        return False
+STOPWORDS = {
+    "a", "an", "the", "and", "or", "but", "if", "then", "than", "so", "to", "of", "in",
+    "on", "for", "with", "at", "by", "from", "is", "are", "was", "were", "be", "been",
+    "it", "this", "that", "these", "those", "i", "you", "we", "they", "he", "she",
+    "me", "my", "your", "our", "their", "about", "tell", "what", "who", "how", "do",
+    "does", "did", "can", "could", "would", "should", "please", "hi", "hello", "hey",
+}
+
+ABOUT_DEVRYZE = (
+    "Devryze is a specialized engineering and AI solutions company focused on building intelligence "
+    "layers for modern enterprises. It helps organizations integrate AI into scalable real-world applications."
+)
+
+DEVRYZE_SERVICES = (
+    "Devryze provides AI chatbot systems, RAG solutions, workflow automation, machine learning systems, "
+    "full-stack web development, mobile applications, data analytics platforms, and enterprise AI architecture consulting."
+)
+
+DEVRYZE_CONTACT = (
+    "You can reach Devryze via https://devryze.tech/, LinkedIn https://www.linkedin.com/company/pk-devryze/, "
+    "Instagram https://www.instagram.com/devryze_pk/, or the contact portal https://www.devryze.tech/#contact."
+)
 
 
 def clean_context_text(text: str) -> str:
     if not text:
         return ""
+    text = re.sub(r"\[[A-Za-z_ ]+:[^\]]+\]", "", text)
     text = re.sub(r"\b[\w\.-]+@[\w\.-]+\.\w+\b", "", text)
-    text = re.sub(r"\[email[^\]]*\]", "", text, flags=re.IGNORECASE)
     lines = []
     for line in text.splitlines():
         stripped = line.strip()
         if not stripped:
             continue
         lowered = stripped.lower()
-        if re.match(r"^(client|customer|assistant description|faq|frequently asked questions)\b", lowered):
-            continue
-        if re.match(r"^(user|facilitation)\b", lowered):
-            continue
-        if re.match(r"^(q:|a:)\b", lowered):
+        if lowered.startswith(META_LINE_PREFIXES):
             continue
         if len(stripped) < 3:
             continue
         lines.append(stripped)
     return "\n".join(lines).strip()
+
+
 text_file = "data.txt"
 pages = []
 if os.path.exists(text_file):
@@ -107,12 +136,9 @@ else:
 
 # 2. Prompt
 prompt = PromptTemplate.from_template(
-    "You are the Devryze Agent for Devryze.tech.\n"
-    "Answer clearly and briefly. Do not repeat the prompt, context, or labels.\n"
-    "Do not invent sources, links, or citations. Use only the provided context.\n"
-    "If the user greets (hello/hi/hey), respond with a short friendly greeting and ask how you can help.\n"
-    "If the user asks what this is, explain Devryze in 1-2 sentences and ask how you can help.\n"
-    "Context URLs (if any): {context_urls}\n"
+    "You are the Devryze support assistant for Devryze.tech.\n"
+    "Answer clearly and briefly using only the provided context.\n"
+    "If the answer is not in the context, say you do not have that information and ask one clarifying question.\n"
     "Context:\n{context}\n\n"
     "User: {question}\n"
     "Assistant:"
@@ -123,11 +149,12 @@ prompt = PromptTemplate.from_template(
 llm_model = os.getenv("LLM_MODEL", "mistralai/Mistral-7B-Instruct-v0.3")
 max_tokens = int(os.getenv("MAX_TOKENS", "128"))
 max_tokens = min(max_tokens, 256)
-temperature = float(os.getenv("TEMPERATURE", "1.0"))
+temperature = float(os.getenv("TEMPERATURE", "0.3"))
 context_max_chars = int(os.getenv("CONTEXT_MAX_CHARS", "800"))
 question_max_chars = int(os.getenv("QUESTION_MAX_CHARS", "500"))
 use_local_model = os.getenv("USE_LOCAL_MODEL", "False") == "True"
 local_model_name = os.getenv("LOCAL_MODEL", "distilgpt2")
+
 
 def build_local_llm():
     tokenizer = AutoTokenizer.from_pretrained(local_model_name)
@@ -141,6 +168,7 @@ def build_local_llm():
         do_sample=True,
     )
     return HuggingFacePipeline(pipeline=gen)
+
 
 if use_local_model:
     llm = build_local_llm()
@@ -156,17 +184,18 @@ else:
 
 
 # 4. Construct chain
+
 def format_docs(docs):
     text = "\n\n".join(doc.page_content for doc in docs)
     if len(text) > context_max_chars:
         return text[:context_max_chars] + "\n\n[context truncated]"
     return text
 
+
 if retriever:
     chain = (
         RunnablePassthrough.assign(
-            context=lambda x: format_docs(retriever.invoke(x["question"])),
-            context_urls=lambda x: "",
+            context=lambda x: format_docs(retriever.invoke(x["question"]))
         )
         | prompt
         | llm
@@ -174,24 +203,11 @@ if retriever:
     )
 else:
     chain = (
-        RunnablePassthrough.assign(context=lambda x: "", context_urls=lambda x: "")
+        RunnablePassthrough.assign(context=lambda x: "")
         | prompt
         | llm
         | StrOutputParser()
     )
-
-
-def extract_sources(text: str) -> list:
-    if not text:
-        return []
-    urls = re.findall(r"https?://[^\s\]\)\}>\"']+", text)
-    deduped = []
-    seen = set()
-    for url in urls:
-        if url not in seen and is_allowed_source(url):
-            deduped.append(url)
-            seen.add(url)
-    return deduped
 
 
 def clean_response(text: str) -> str:
@@ -203,6 +219,8 @@ def clean_response(text: str) -> str:
         except Exception:
             return ""
 
+    text = re.sub(r"\[[A-Za-z_ ]+:[^\]]*\]", "", text)
+
     for marker in ("Assistant:", "assistant:", "ASSISTANT:"):
         if marker in text:
             text = text.split(marker)[-1]
@@ -210,63 +228,18 @@ def clean_response(text: str) -> str:
         if marker in text:
             text = text.split(marker)[0]
 
-    if "Sources:" in text:
-        text = text.split("Sources:")[0]
-
     lines = []
     for line in text.strip().splitlines():
         lowered = line.strip().lower()
-        if lowered.startswith("you are the devryze agent"):
+        if lowered.startswith(META_LINE_PREFIXES):
             continue
         if lowered.startswith("context:"):
             continue
-        if lowered.startswith("document protocol:"):
+        if lowered.startswith("assistant:"):
             continue
         if lowered.startswith("user:"):
             continue
-        if lowered.startswith("print sources"):
-            continue
-        if lowered.startswith("sources:"):
-            continue
-        if lowered.startswith("assistant description"):
-            continue
-        if lowered.startswith("customer:"):
-            continue
-        if lowered.startswith("person:"):
-            continue
-        if lowered.startswith("assistant:"):
-            continue
-        if lowered.startswith("user is this response acceptable"):
-            continue
-        if lowered.startswith("facilitation:"):
-            continue
-        if lowered.startswith("rewrite the answer"):
-            continue
-        if lowered.startswith("return only a rewritten answer"):
-            continue
-        if lowered.startswith("answer:"):
-            line = line.split(":", 1)[-1].strip()
-            if not line:
-                continue
-        if re.search(r"\bsources\b", lowered) and re.search(r"https?://", lowered):
-            continue
-        if "[context truncated]" in lowered:
-            line = line.replace("[context truncated]", "").strip()
-            if not line:
-                continue
-        if "http://" in line or "https://" in line:
-            continue
-        if line.count("/") >= 2 or line.count("|") >= 2:
-            continue
-        alpha = sum(1 for c in line if c.isalpha())
-        if alpha and alpha / max(len(line), 1) < 0.45:
-            continue
-        letters = [c for c in line if c.isalpha()]
-        if letters:
-            upper_ratio = sum(1 for c in letters if c.isupper()) / len(letters)
-            if upper_ratio > 0.8 and len(line) > 20:
-                continue
-        lines.append(line)
+        lines.append(line.strip())
 
     return "\n".join(lines).strip()
 
@@ -274,9 +247,11 @@ def clean_response(text: str) -> str:
 def is_low_quality_response(text: str) -> bool:
     if not text:
         return True
-    if len(text.strip()) < 25:
+    if len(text.strip()) < 20:
         return True
-    if text.count("/") >= 2 or text.count("|") >= 2:
+    if re.search(r"\b(section|topic|source_id|client)\b", text, flags=re.IGNORECASE):
+        return True
+    if "[" in text and "]" in text:
         return True
     alpha = sum(1 for c in text if c.isalpha())
     if alpha and alpha / max(len(text), 1) < 0.5:
@@ -284,59 +259,65 @@ def is_low_quality_response(text: str) -> bool:
     return False
 
 
+def tokenize(text: str) -> set:
+    tokens = re.findall(r"[a-zA-Z0-9]+", text.lower())
+    return {t for t in tokens if len(t) > 2 and t not in STOPWORDS}
+
+
+def has_context_overlap(question: str, context: str) -> bool:
+    q_tokens = tokenize(question)
+    if not q_tokens:
+        return True
+    context_lower = context.lower()
+    return any(token in context_lower for token in q_tokens)
+
+
+def deterministic_response(question: str) -> str | None:
+    q = question.strip().lower()
+    if re.search(r"\b(what is devryze|who is devryze|tell me about devryze|about devryze)\b", q):
+        return ABOUT_DEVRYZE
+    if re.search(r"\b(services|service|offer|provide|capabilities|what do you do)\b", q):
+        return DEVRYZE_SERVICES
+    if re.search(r"\b(contact|reach|email|phone|connect)\b", q):
+        return DEVRYZE_CONTACT
+    return None
+
+
 # 5. Chat function
 @traceable
 def chat(message, user_id: str = "default_user"):
     try:
         safe_message = message[:question_max_chars]
-        context = ""
-        context_urls = []
-        if retriever:
-            docs = retriever.invoke(safe_message)
-            context = format_docs(docs)
-            context_urls = extract_sources(context)
+        if safe_message.strip().lower() in {"hi", "hello", "hey", "hello there", "hey there"}:
+            return "Hello! How can I help you today?"
+
+        direct = deterministic_response(safe_message)
+        if direct:
+            return direct
+
+        docs = retriever.invoke(safe_message) if retriever else []
+        context = format_docs(docs) if docs else ""
+        if not context or not has_context_overlap(safe_message, context):
+            return "I do not have that information. What would you like to know about Devryze?"
 
         prompt_text = prompt.format(
             context=context,
             question=safe_message,
-            context_urls=", ".join(context_urls),
         )
         response = llm.invoke(prompt_text)
-        # Normalize response to a string so the API always returns readable text
         if response is None:
-            print("Warning: wrapped_chain returned None for message:", message)
-            return "No response from model (check server logs for details)."
-        if not isinstance(response, str):
-            try:
-                response_str = str(response)
-            except Exception:
-                response_str = "[unserializable response from model]"
-            return clean_response(response_str) or response_str
+            return "I do not have that information yet. What would you like to know about Devryze?"
+
         cleaned = clean_response(response)
-        if safe_message.strip().lower() in {"hi", "hello", "hey", "hello there", "hey there"}:
-            cleaned = "Hello! How can I help you today?"
-        elif is_low_quality_response(cleaned):
-            rewrite_prompt = (
-                "Return only a rewritten answer in 2-4 sentences. "
-                "Do not include sources, labels, or links. If unsure, ask one clarifying question.\n\n"
-                f"Answer: {cleaned}"
-            )
-            rewritten = llm.invoke(rewrite_prompt)
-            rewritten_clean = clean_response(rewritten)
-            if rewritten_clean and not is_low_quality_response(rewritten_clean):
-                cleaned = rewritten_clean
-            elif not cleaned:
-                cleaned = "Could you clarify what you need help with?"
-        return cleaned or response
+        if is_low_quality_response(cleaned):
+            return "I do not have that information. What would you like to know about Devryze?"
+        return cleaned
     except StopIteration:
-        print("Chat Error: StopIteration")
         return "I encountered an error: model returned no output. Try again."
     except Exception as e:
-        error_text = str(e).strip()
-        if not error_text:
-            error_text = repr(e)
+        error_text = str(e).strip() or repr(e)
         print(f"Chat Error: {error_text}")
-        return f"I encountered an error: {error_text}"
+        return "I encountered an error. Please try again."
 
 
 print("Devryze Chatbot chain loaded")
